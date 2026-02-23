@@ -17,6 +17,7 @@ interface ClientData {
     marketItems: Item[];
     currencyAmt: number;
     playerOrders: number;
+    playerCid: string;
 }
 
 const App: React.FC = () => {
@@ -68,6 +69,7 @@ const App: React.FC = () => {
             setMarketItems(data.marketItems ?? []);
             setPlayerCash(data.currencyAmt ?? 0);
             setPlayerOrders(data.playerOrders ?? 0);
+            setPlayerCid(data.playerCid ?? '');
         });
         fetchNui<Listing[]>('getListings').then(data => setListings(data ?? []));
     }, [visible]);
@@ -186,6 +188,7 @@ const App: React.FC = () => {
         ...ContrabandItems.map(i => ({ ...i, stock: Math.max(i.minStock, Math.min(i.maxStock, i.maxStock)) })),
     ];
 
+    // playerCid is now correctly set from the server so this filter works
     const myListings = listings.filter(l => l.seller_cid === playerCid && l.status === 'available');
 
     function refreshListings() {

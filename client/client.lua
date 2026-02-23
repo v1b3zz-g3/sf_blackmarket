@@ -379,17 +379,22 @@ end)
 -- ─── NUI Callbacks ────────────────────────────────────────────────────────────
 RegisterNUICallback("getClientData", function(data, cb)
     currentMoney = PlayerData.money[Config.paymentType]
-    local function respond(items, playerOrders)
-        cb({ marketItems = items, currencyAmt = currentMoney, playerOrders = playerOrders })
+    local function respond(items, pdData)
+        cb({
+            marketItems  = items,
+            currencyAmt  = currentMoney,
+            playerOrders = pdData.orders,
+            playerCid    = pdData.cid,   -- Pass CID to UI so "My Listings" tab can filter correctly
+        })
     end
     QBCore.Functions.TriggerCallback("sf_blackmarket_sv:getPlayerData", function(pdData)
         if not marketItems then
             QBCore.Functions.TriggerCallback("sf_blackmarket_sv:getMarketItems", function(items)
                 marketItems = items
-                respond(marketItems, pdData.orders)
+                respond(marketItems, pdData)
             end)
         else
-            respond(marketItems, pdData.orders)
+            respond(marketItems, pdData)
         end
     end)
 end)
@@ -508,6 +513,23 @@ AddEventHandler('onResourceStop', function(resourceName)
     for i = 1, #goodsTargetZones do exports['qb-target']:RemoveZone(goodsTargetZones[i]) end
     targetZones      = {}
     goodsTargetZones = {}
+end)
+
+-- ─── Resource Restart Recovery ────────────────────────────────────────────────
+-- When the resource restarts while players are online, OnPlayerLoaded won't fire.
+-- We re-trigger initPendingOrders so the tablet/containers restore correctly.
+AddEventHandler('onResourceStart', function(resourceName)
+    if resourceName ~= GetCurrentResourceName() then return end
+    -- Wait for server-side DB queries to finish before requesting state
+    SetTimeout(2000, function()
+        local ped = PlayerPedId()
+        if ped ~= 0 and NetworkIsPlayerActive(PlayerId()) then
+            -- Reset local state so it reloads fresh from server
+            marketItems   = nil
+            orderLocation = nil
+            TriggerServerEvent("sf_blackmarket_sv:initPendingOrders")
+        end
+    end)
 end)
 
 RegisterNetEvent("sf_blackmarket_cl:updateListings", function(listings)

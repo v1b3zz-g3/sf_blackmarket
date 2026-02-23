@@ -4,7 +4,7 @@ Config.useItem      = "encryptedtablet"
 Config.paymentType  = "crypto"  -- cash, bank or crypto
 Config.cryptoAcronym = "QBT"
 Config.cryptoIcon   = "fa-solid fa-bitcoin-sign"
-Config.inventory    = "qb-inventory"  -- needed for fetching images
+Config.inventory    = "qs-inventory"  -- needed for fetching images
 
 Config.randomItems  = false  -- number of items chosen at random, set false for all items
 Config.reset        = 360    -- mins for market to restock

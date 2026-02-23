@@ -324,11 +324,12 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:getMarketItems", function(src
     cb(marketItems)
 end)
 
+-- Returns orders count AND citizenid so the client can identify its own listings
 QBCore.Functions.CreateCallback("sf_blackmarket_sv:getPlayerData", function(src, cb)
     local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then cb({ orders = 0 }); return end
+    if not Player then cb({ orders = 0, cid = '' }); return end
     getPlayerOrders(Player.PlayerData.citizenid, function(count)
-        cb({ orders = count })
+        cb({ orders = count, cid = Player.PlayerData.citizenid })
     end)
 end)
 
@@ -698,12 +699,12 @@ RegisterNetEvent("sf_blackmarket_sv:finishLooting", function(index)
         slot = slot + 1
     end
 
+    local savedSrc = src
     saveOrderStash(stashId, orderItems, function(id)
-        src = src
-        if id then
-            TriggerClientEvent("inventory:client:SetCurrentStash", src, stashId)
-            exports[Config.inventory]:OpenInventory("stash", stashId, nil, src)
-        end
+        if not id then return end
+        if not QBCore.Functions.GetPlayer(savedSrc) then return end
+        TriggerClientEvent("inventory:client:SetCurrentStash", savedSrc, stashId)
+        exports[Config.inventory]:OpenInventory("stash", stashId, nil, savedSrc)
     end)
 
     order.lootInProgress = false
@@ -829,11 +830,13 @@ RegisterNetEvent("sf_blackmarket_sv:finishLootingGoods", function(listingId)
     end
     stashItems[1] = entry
 
+    local savedSrc    = src
+    local savedStashId = gc.stashId
     saveOrderStash(gc.stashId, stashItems, function(id)
-        if id then
-            TriggerClientEvent("inventory:client:SetCurrentStash", src, gc.stashId)
-            exports[Config.inventory]:OpenInventory("stash", gc.stashId, nil, src)
-        end
+        if not id then return end
+        if not QBCore.Functions.GetPlayer(savedSrc) then return end
+        TriggerClientEvent("inventory:client:SetCurrentStash", savedSrc, savedStashId)
+        exports[Config.inventory]:OpenInventory("stash", savedStashId, nil, savedSrc)
     end)
 
     gc.isLooted = true
@@ -846,9 +849,8 @@ RegisterNetEvent("sf_blackmarket_sv:cancelLootGoods", function(listingId)
     -- handled client-side; nothing needed server-side
 end)
 
--- ─── Init Pending Orders (on player login) ────────────────────────────────────
-RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
-    local src    = source
+-- ─── Init Player Orders (shared logic, called on login AND resource restart) ──
+local function initPlayerOrders(src)
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
     local cid = Player.PlayerData.citizenid
@@ -858,6 +860,7 @@ RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
             v.src = src
             TriggerClientEvent("sf_blackmarket_cl:hasPendingOrder", src, marketItems, v.order, v.deliveryTime)
 
+            -- Check if any props went missing (e.g. server restarted and entities got deleted)
             local propDespawned = false
             if v.props then
                 for prop, netId in pairs(v.props) do
@@ -871,11 +874,12 @@ RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
             if propDespawned then
                 for _, netId in pairs(v.props) do
                     local ent = NetworkGetEntityFromNetworkId(netId)
-                    if not DoesEntityExist(ent) then DeleteEntity(ent) end
+                    if DoesEntityExist(ent) then DeleteEntity(ent) end
                 end
                 v.props = nil
             end
 
+            -- If delivery time has passed, re-trigger orderReady so client spawns the container
             if os.time() - v.deliveryTime > 0 then
                 if not v.props then
                     if v.isOpen then
@@ -889,6 +893,7 @@ RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
             end
         end
 
+        -- Re-add targets for all orders with live props (for everyone, not just the owner)
         if v.props then
             if not v.isOpen then
                 local lock       = NetworkGetEntityFromNetworkId(v.props.lock)
@@ -923,6 +928,11 @@ RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
     end
 
     TriggerClientEvent("sf_blackmarket_cl:updateMarketItems", src, marketItems)
+end
+
+-- ─── Init Pending Orders (on player login) ────────────────────────────────────
+RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
+    initPlayerOrders(source)
 end)
 
 -- ─── Player Drop ──────────────────────────────────────────────────────────────
@@ -941,58 +951,74 @@ AddEventHandler('onResourceStart', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     getMarketItems()
 
+    local queriesDone = 0
+    local function onAllQueriesDone()
+        queriesDone = queriesDone + 1
+        if queriesDone < 2 then return end
+        -- Both DB queries finished — re-init any players already online (resource restart case)
+        SetTimeout(500, function()
+            for _, playerSrc in ipairs(GetPlayers()) do
+                initPlayerOrders(tonumber(playerSrc))
+            end
+        end)
+    end
+
     MySQL.query('SELECT * FROM sf_blackmarket_orders WHERE is_looted = 0', {}, function(rows)
-        if not rows then setupAvailableLocations(); return end
-        for _, row in ipairs(rows) do
-            local idx        = row.location_index
-            pendingOrders[idx] = {
-                src            = nil,
-                cid            = row.buyer_cid,
-                order          = json.decode(row.order_data),
-                deliveryTime   = row.delivery_time,
-                stashId        = row.stash_id,
-                lockInProgress = false,
-                lootInProgress = false,
-                isOpen         = row.is_open == 1,
-                isLooted       = row.is_looted == 1,
-                props          = nil,
-                orderType      = row.order_type or "import",
-            }
+        if rows then
+            for _, row in ipairs(rows) do
+                local idx        = row.location_index
+                pendingOrders[idx] = {
+                    src            = nil,
+                    cid            = row.buyer_cid,
+                    order          = json.decode(row.order_data),
+                    deliveryTime   = row.delivery_time,
+                    stashId        = row.stash_id,
+                    lockInProgress = false,
+                    lootInProgress = false,
+                    isOpen         = row.is_open == 1,
+                    isLooted       = row.is_looted == 1,
+                    props          = nil,
+                    orderType      = row.order_type or "import",
+                }
+            end
         end
         setupAvailableLocations()
+        onAllQueriesDone()
     end)
 
     MySQL.query("SELECT * FROM sf_blackmarket_listings WHERE status = 'sold' AND sealed = 0 AND is_looted = 0", {}, function(rows)
-        if not rows then return end
-        for _, row in ipairs(rows) do
-            if row.location_index and row.seal_deadline then
-                goodsContainers[row.id] = {
-                    listingId     = row.id,
-                    sellerCid     = row.seller_cid,
-                    buyerCid      = row.buyer_cid,
-                    buyerSrc      = nil,
-                    item          = row.item,
-                    label         = row.label,
-                    quantity      = row.quantity,
-                    price         = row.price,
-                    locationIndex = row.location_index,
-                    stashId       = row.stash_id,
-                    sealDeadline  = row.seal_deadline,
-                    props         = nil,
-                    sealed        = false,
-                    isLooted      = false,
-                }
-                if os.time() > row.seal_deadline then
-                    SetTimeout(100, function() goodsContainerExpired(row.id) end)
-                else
-                    local remaining = (row.seal_deadline - os.time()) * 1000
-                    SetTimeout(remaining, function()
-                        local gc = goodsContainers[row.id]
-                        if gc and not gc.sealed then goodsContainerExpired(row.id) end
-                    end)
+        if rows then
+            for _, row in ipairs(rows) do
+                if row.location_index and row.seal_deadline then
+                    goodsContainers[row.id] = {
+                        listingId     = row.id,
+                        sellerCid     = row.seller_cid,
+                        buyerCid      = row.buyer_cid,
+                        buyerSrc      = nil,
+                        item          = row.item,
+                        label         = row.label,
+                        quantity      = row.quantity,
+                        price         = row.price,
+                        locationIndex = row.location_index,
+                        stashId       = row.stash_id,
+                        sealDeadline  = row.seal_deadline,
+                        props         = nil,
+                        sealed        = false,
+                        isLooted      = false,
+                    }
+                    if os.time() > row.seal_deadline then
+                        SetTimeout(100, function() goodsContainerExpired(row.id) end)
+                    else
+                        local remaining = (row.seal_deadline - os.time()) * 1000
+                        SetTimeout(remaining, function()
+                            local gc = goodsContainers[row.id]
+                            if gc and not gc.sealed then goodsContainerExpired(row.id) end
+                        end)
+                    end
                 end
             end
         end
+        onAllQueriesDone()
     end)
 end)
 

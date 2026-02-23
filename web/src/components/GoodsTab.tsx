@@ -104,30 +104,34 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                     {available.length === 0 && (
                         <div id="checkout-empty">No items listed yet</div>
                     )}
-                    {available.map(listing => (
-                        <div key={listing.id} className="goods-card">
-                            <ItemImg image={listing.image} label={listing.label} className="goods-img" />
-                            <div className="goods-info">
-                                <div className="goods-name">{listing.label}</div>
-                                <div className="goods-meta">
-                                    <span>{listing.quantity}x</span>
-                                    <span className="goods-seller">by {listing.seller_name}</span>
+                    {available.map(listing => {
+                        const isOwn = listing.seller_cid === playerCid;
+                        const isBuying = buying === listing.id;
+                        return (
+                            <div key={listing.id} className="goods-card">
+                                <ItemImg image={listing.image} label={listing.label} className="goods-img" />
+                                <div className="goods-info">
+                                    <div className="goods-name">{listing.label}</div>
+                                    {/* Always show Anonymous — never reveal the seller */}
+                                    <div className="goods-meta">
+                                        <span>{listing.quantity}x</span>
+                                        <span className="goods-seller">Anonymous</span>
+                                    </div>
+                                    <div className="goods-price-inline">
+                                        <PriceTag amount={listing.price} />
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="goods-right">
-                                <div className="goods-price">
-                                    <PriceTag amount={listing.price} />
-                                </div>
+                                {/* Buy button sits on the right, vertically centered */}
                                 <button
-                                    className={`item-add ${(buying === listing.id || listing.seller_cid === playerCid) ? 'disable-button' : ''}`}
-                                    disabled={buying === listing.id || listing.seller_cid === playerCid}
+                                    className={`goods-buy-btn ${(isBuying || isOwn) ? 'disable-button' : ''}`}
+                                    disabled={isBuying || isOwn}
                                     onClick={() => handleBuy(listing.id)}
                                 >
-                                    {listing.seller_cid === playerCid ? 'Your listing' : 'Buy'}
+                                    {isOwn ? 'Yours' : isBuying ? '...' : 'Buy'}
                                 </button>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
@@ -150,22 +154,19 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                                     </div>
                                     <div className="goods-meta">
                                         <span>{listing.quantity}x</span>
-                                        <span>Buyer: {listing.buyer_name}</span>
                                     </div>
                                     {listing.seal_deadline && (
                                         <div className="goods-timer">⏱ {formatTimeLeft(listing.seal_deadline)}</div>
                                     )}
-                                </div>
-                                <div className="goods-right">
-                                    <div className="goods-price">
+                                    <div className="goods-price-inline">
                                         <PriceTag amount={listing.price} />
                                     </div>
-                                    {alert && (
-                                        <button className="goods-gps-btn" onClick={() => handleGPS(alert.coords)}>
-                                            <i className="fa-solid fa-location-dot" />
-                                        </button>
-                                    )}
                                 </div>
+                                {alert && (
+                                    <button className="goods-gps-btn" onClick={() => handleGPS(alert.coords)}>
+                                        <i className="fa-solid fa-location-dot" /> GPS
+                                    </button>
+                                )}
                             </div>
                         );
                     })}
@@ -177,17 +178,17 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                             <div className="goods-info">
                                 <div className="goods-name">{listing.label}</div>
                                 <div className="goods-meta"><span>{listing.quantity}x</span></div>
-                            </div>
-                            <div className="goods-right">
-                                <div className="goods-price">
+                                <div className="goods-price-inline">
                                     <PriceTag amount={listing.price} />
                                 </div>
-                                <button className="checkout-remove" onClick={() => handleRemove(listing.id)}>Remove</button>
                             </div>
+                            <button className="checkout-remove goods-remove-btn" onClick={() => handleRemove(listing.id)}>
+                                Remove
+                            </button>
                         </div>
                     ))}
 
-                    {/* Pending purchases (buyer waiting) */}
+                    {/* Pending purchases (buyer waiting for seller to deliver) */}
                     {myPending.map(listing => {
                         const alert = buyerAlerts.find(a => a.listingId === listing.id);
                         return (
@@ -198,17 +199,15 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                                         {listing.label} <span className="badge-pending">AWAITING</span>
                                     </div>
                                     <div className="goods-meta"><span>{listing.quantity}x</span></div>
-                                </div>
-                                <div className="goods-right">
-                                    <div className="goods-price">
+                                    <div className="goods-price-inline">
                                         <PriceTag amount={listing.price} />
                                     </div>
-                                    {alert && (
-                                        <button className="goods-gps-btn" onClick={() => handleGPS(alert.coords)}>
-                                            <i className="fa-solid fa-location-dot" />
-                                        </button>
-                                    )}
                                 </div>
+                                {alert && (
+                                    <button className="goods-gps-btn" onClick={() => handleGPS(alert.coords)}>
+                                        <i className="fa-solid fa-location-dot" /> GPS
+                                    </button>
+                                )}
                             </div>
                         );
                     })}

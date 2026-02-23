@@ -450,8 +450,7 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
 .goods-meta { font-size: 1.2vh; color: rgba(255,255,255,.5); display: flex; gap: 1vh; }
 .goods-seller { color: rgba(255,255,255,.35); }
 .goods-timer { font-size: 1.2vh; color: var(--sold); }
-.goods-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.6vh; min-width: 10vh; }
-.goods-price { font-size: 1.4vh; font-weight: 600; }
+
 
 .badge-sold    { font-size: 1vh; font-weight: 700; color: var(--sold);    background: rgba(240,165,0,.15); padding: 0.1vh 0.5vh; border-radius: 0.2vh; }
 .badge-pending { font-size: 1vh; font-weight: 700; color: var(--pending); background: rgba(108,122,219,.15); padding: 0.1vh 0.5vh; border-radius: 0.2vh; }
@@ -625,5 +624,62 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
 }
 .inv-total-preview span:last-child {
     font-weight: 600;
+    color: white;
+}
+/* Price shown inline inside goods-info (below meta row) */
+.goods-price-inline {
+    font-size: 1.35vh;
+    font-weight: 600;
+    color: white;
+    margin-top: 0.3vh;
+    display: flex;
+    align-items: center;
+}
+
+/* Buy button on the right side of the card, vertically centered */
+.goods-buy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 7vh;
+    height: 3vh;
+    padding: 0 1.2vh;
+    background-color: var(--accent);
+    border: none;
+    border-radius: 0.4vh;
+    color: white;
+    font-size: 1.3vh;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    align-self: center;
+    transition: background-color 0.15s;
+}
+.goods-buy-btn:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+}
+.goods-buy-btn.disable-button {
+    background-color: #5f5f5f;
+    color: #898989;
+    cursor: not-allowed;
+}
+
+/* Remove button aligned right inside my-listings cards */
+.goods-remove-btn {
+    align-self: center;
+    flex-shrink: 0;
+    font-size: 1.2vh;
+    padding: 0;
+    width: auto;
+}
+
+/* Override: goods-card is now a flat flex row, items vertically centered */
+.goods-card {
+    display: flex;
+    align-items: center;
+    gap: 1vh;
+    background-color: var(--background-2);
+    border-radius: 0.5vh;
+    padding: 1vh;
     color: white;
 }
