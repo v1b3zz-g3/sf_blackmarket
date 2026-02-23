@@ -25,7 +25,6 @@ const App: React.FC = () => {
     const [searchTerm, setSearchTerm]         = useState('');
     const [activeTab, setActiveTab]           = useState<TabId>('imports');
     const [marketItems, setMarketItems]       = useState<Item[]>([]);
-    const [contrabandBaseItems, setContrabandBaseItems] = useState<Item[]>([]);
     const [playerCash, setPlayerCash]         = useState(0);
     const [playerOrders, setPlayerOrders]     = useState(0);
     const [playerCid, setPlayerCid]           = useState('');
@@ -43,6 +42,14 @@ const App: React.FC = () => {
     const [sellerAlerts, setSellerAlerts]     = useState<{ listingId: number; coords: any; sealDeadline: number; label: string }[]>([]);
     const [buyerAlerts, setBuyerAlerts]       = useState<{ listingId: number; coords: any }[]>([]);
 
+    // ── Pending amount: total cost of the active pending order ───────────────
+    const pendingAmt = pendingOrder
+        ? cartItems.reduce((sum, item) => {
+              const qty = typeof item.quantity === 'number' ? item.quantity : 0;
+              return sum + item.price * qty;
+          }, 0)
+        : 0;
+
     // ── Fetch config on mount ────────────────────────────────────────────────
     useEffect(() => {
         fetchNui<{ configData: any; notifData: any; contrabandItems: any[] }>('fetchConfig').then(data => {
@@ -50,7 +57,6 @@ const App: React.FC = () => {
             for (const [k, v] of Object.entries(data.notifData)) (ConfigNotif as any)[k] = v;
             setContrabandRequired(data.configData.contrabandRequired ?? 60);
             setContrabandDiscount(data.configData.contrabandDiscount ?? 20);
-            // Store contraband extra items globally
             ContrabandItems.splice(0, ContrabandItems.length, ...data.contrabandItems);
         });
     }, []);
@@ -175,7 +181,6 @@ const App: React.FC = () => {
             );
         });
 
-    // Build contraband items (imports discounted + extra items)
     const contrabandAllItems: Item[] = [
         ...marketItems,
         ...ContrabandItems.map(i => ({ ...i, stock: Math.max(i.minStock, Math.min(i.maxStock, i.maxStock)) })),
@@ -193,14 +198,13 @@ const App: React.FC = () => {
             <div id="camera" className={ConfigUI.tabletColour === 'dark' ? 'camera-dark' : 'camera-light'} />
             <div id="tablet-screen">
                 <Header
-                    icon={ConfigUI.paymentType === 'crypto' ? <i className={String(ConfigUI.cryptoIcon)} /> : '$'}
                     amt={playerCash}
+                    pendingAmt={pendingAmt}
                     handleSearch={e => setSearchTerm(e.target.value)}
                 />
                 {notification && <Notif notifyData={notification} onDismiss={() => setNotification(null)} />}
 
                 <div id="main-container">
-                    {/* Collapsible Tab Sidebar */}
                     <TabSidebar
                         activeTab={activeTab}
                         onTabChange={tab => { setActiveTab(tab); setSearchTerm(''); }}
@@ -208,7 +212,6 @@ const App: React.FC = () => {
                         contrabandRequired={contrabandRequired}
                     />
 
-                    {/* Tab Content */}
                     <div id="tab-content">
                         {/* ── IMPORTS TAB ── */}
                         {activeTab === 'imports' && (

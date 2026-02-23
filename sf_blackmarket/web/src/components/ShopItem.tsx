@@ -1,5 +1,5 @@
 import { Item } from '../types/interfaces';
-import { ConfigUI } from '../config';
+import { ItemImg, PriceTag } from './SharedComponents';
 
 interface ShopItemProps {
     item: Item;
@@ -14,16 +14,22 @@ const ShopItem = ({ item, disableAdd, addToCart, discountPct = 0 }: ShopItemProp
     return (
         <div className="item-container">
             <div className="item-name">{item.label}</div>
-            <img src={`https://cfx-nui-${ConfigUI.inventory}/html/images/${item.image}`} alt={item.label} />
+            <ItemImg image={item.image} label={item.label} />
             <div className="item-price">
-                {discountPct > 0 && <span className="item-original-price">
-                    {ConfigUI.paymentType === "crypto" ? `${item.price} ${ConfigUI.acronym}` : `$${item.price}`}
-                </span>}
-                {ConfigUI.paymentType === "crypto" ? `${displayPrice} ${ConfigUI.acronym}` : `$${displayPrice}`}
+                {discountPct > 0 && (
+                    <span className="item-original-price">
+                        <PriceTag amount={item.price} />
+                    </span>
+                )}
+                <PriceTag amount={displayPrice} />
                 {discountPct > 0 && <span className="discount-badge">-{discountPct}%</span>}
             </div>
             <div className="item-stock">Stock: {item.stock}</div>
-            <button onClick={() => addToCart({ ...item, price: displayPrice })} disabled={disableAdd} className="item-add">
+            <button
+                onClick={() => addToCart({ ...item, price: displayPrice })}
+                disabled={disableAdd}
+                className="item-add"
+            >
                 Add To Cart
             </button>
         </div>

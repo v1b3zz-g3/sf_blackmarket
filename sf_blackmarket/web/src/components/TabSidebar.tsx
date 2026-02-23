@@ -9,8 +9,8 @@ interface TabSidebarProps {
 }
 
 const tabs: { id: TabId; icon: string; label: string }[] = [
-    { id: 'imports',    icon: 'fa-solid fa-ship',         label: 'Imports'    },
-    { id: 'goods',      icon: 'fa-solid fa-handshake',    label: 'Goods'      },
+    { id: 'imports',    icon: 'fa-solid fa-ship',             label: 'Imports'    },
+    { id: 'goods',      icon: 'fa-solid fa-handshake',        label: 'Goods'      },
     { id: 'contraband', icon: 'fa-solid fa-skull-crossbones', label: 'Contraband' },
 ];
 

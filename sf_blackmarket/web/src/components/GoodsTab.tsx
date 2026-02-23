@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Listing } from '../types/interfaces';
-import { ConfigUI } from '../config';
 import { fetchNui } from '../utils/fetchNui';
+import { ItemImg, PriceTag } from './SharedComponents';
 import CreateListingModal from './CreateListingModal';
 
 interface GoodsTabProps {
@@ -25,9 +25,9 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
     const [showModal, setShowModal]   = useState(false);
     const [activeView, setActiveView] = useState<'market' | 'mine'>('market');
     const [buying, setBuying]         = useState<number | null>(null);
-    const [tick, setTick]             = useState(0);
+    const [, setTick]                 = useState(0);
 
-    // Update countdown every second
+    // Countdown ticker
     useEffect(() => {
         const interval = setInterval(() => setTick(t => t + 1), 1000);
         return () => clearInterval(interval);
@@ -55,7 +55,7 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
 
     return (
         <div className="goods-tab">
-            {/* Alert banners */}
+            {/* ── Alert banners ── */}
             {sellerAlerts.map(alert => (
                 <div key={alert.listingId} className="goods-alert seller-alert">
                     <i className="fa-solid fa-truck" />
@@ -81,7 +81,7 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                 </div>
             ))}
 
-            {/* View toggle */}
+            {/* ── View toggle ── */}
             <div className="goods-header">
                 <div className="goods-tabs-toggle">
                     <button
@@ -98,6 +98,7 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                 </button>
             </div>
 
+            {/* ── Market view ── */}
             {activeView === 'market' && (
                 <div className="goods-list">
                     {available.length === 0 && (
@@ -105,11 +106,7 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                     )}
                     {available.map(listing => (
                         <div key={listing.id} className="goods-card">
-                            <img
-                                className="goods-img"
-                                src={`https://cfx-nui-${ConfigUI.inventory}/html/images/${listing.image}`}
-                                alt={listing.label}
-                            />
+                            <ItemImg image={listing.image} label={listing.label} className="goods-img" />
                             <div className="goods-info">
                                 <div className="goods-name">{listing.label}</div>
                                 <div className="goods-meta">
@@ -119,9 +116,7 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                             </div>
                             <div className="goods-right">
                                 <div className="goods-price">
-                                    {ConfigUI.paymentType === 'crypto'
-                                        ? `${listing.price} ${ConfigUI.acronym}`
-                                        : `$${listing.price}`}
+                                    <PriceTag amount={listing.price} />
                                 </div>
                                 <button
                                     className={`item-add ${(buying === listing.id || listing.seller_cid === playerCid) ? 'disable-button' : ''}`}
@@ -136,6 +131,7 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                 </div>
             )}
 
+            {/* ── My Listings view ── */}
             {activeView === 'mine' && (
                 <div className="goods-list">
                     {myListings.length === 0 && mySales.length === 0 && myPending.length === 0 && (
@@ -147,9 +143,11 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                         const alert = sellerAlerts.find(a => a.listingId === listing.id);
                         return (
                             <div key={listing.id} className="goods-card goods-card-sold">
-                                <img className="goods-img" src={`https://cfx-nui-${ConfigUI.inventory}/html/images/${listing.image}`} alt={listing.label} />
+                                <ItemImg image={listing.image} label={listing.label} className="goods-img" />
                                 <div className="goods-info">
-                                    <div className="goods-name">{listing.label} <span className="badge-sold">SOLD</span></div>
+                                    <div className="goods-name">
+                                        {listing.label} <span className="badge-sold">SOLD</span>
+                                    </div>
                                     <div className="goods-meta">
                                         <span>{listing.quantity}x</span>
                                         <span>Buyer: {listing.buyer_name}</span>
@@ -160,7 +158,7 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                                 </div>
                                 <div className="goods-right">
                                     <div className="goods-price">
-                                        {ConfigUI.paymentType === 'crypto' ? `${listing.price} ${ConfigUI.acronym}` : `$${listing.price}`}
+                                        <PriceTag amount={listing.price} />
                                     </div>
                                     {alert && (
                                         <button className="goods-gps-btn" onClick={() => handleGPS(alert.coords)}>
@@ -175,14 +173,14 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                     {/* Active listings */}
                     {myListings.map(listing => (
                         <div key={listing.id} className="goods-card">
-                            <img className="goods-img" src={`https://cfx-nui-${ConfigUI.inventory}/html/images/${listing.image}`} alt={listing.label} />
+                            <ItemImg image={listing.image} label={listing.label} className="goods-img" />
                             <div className="goods-info">
                                 <div className="goods-name">{listing.label}</div>
                                 <div className="goods-meta"><span>{listing.quantity}x</span></div>
                             </div>
                             <div className="goods-right">
                                 <div className="goods-price">
-                                    {ConfigUI.paymentType === 'crypto' ? `${listing.price} ${ConfigUI.acronym}` : `$${listing.price}`}
+                                    <PriceTag amount={listing.price} />
                                 </div>
                                 <button className="checkout-remove" onClick={() => handleRemove(listing.id)}>Remove</button>
                             </div>
@@ -194,14 +192,16 @@ const GoodsTab: React.FC<GoodsTabProps> = ({ listings, myListings, playerCid, se
                         const alert = buyerAlerts.find(a => a.listingId === listing.id);
                         return (
                             <div key={listing.id} className="goods-card goods-card-pending">
-                                <img className="goods-img" src={`https://cfx-nui-${ConfigUI.inventory}/html/images/${listing.image}`} alt={listing.label} />
+                                <ItemImg image={listing.image} label={listing.label} className="goods-img" />
                                 <div className="goods-info">
-                                    <div className="goods-name">{listing.label} <span className="badge-pending">AWAITING</span></div>
+                                    <div className="goods-name">
+                                        {listing.label} <span className="badge-pending">AWAITING</span>
+                                    </div>
                                     <div className="goods-meta"><span>{listing.quantity}x</span></div>
                                 </div>
                                 <div className="goods-right">
                                     <div className="goods-price">
-                                        {ConfigUI.paymentType === 'crypto' ? `${listing.price} ${ConfigUI.acronym}` : `$${listing.price}`}
+                                        <PriceTag amount={listing.price} />
                                     </div>
                                     {alert && (
                                         <button className="goods-gps-btn" onClick={() => handleGPS(alert.coords)}>

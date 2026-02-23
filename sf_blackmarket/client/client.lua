@@ -282,7 +282,6 @@ RegisterNetEvent("sf_blackmarket_cl:goodsSpawnContainer", function(listingId, lo
 end)
 
 RegisterNetEvent("sf_blackmarket_cl:addGoodsSellerTarget", function(listingId, lockCoords, sellerCid)
-    -- Only the seller can see this zone (enforced server-side too)
     local myServerId  = GetPlayerServerId(PlayerId())
     local zoneName    = "bm_goods_seal_" .. listingId
     for i = 1, #goodsTargetZones do if goodsTargetZones[i] == zoneName then return end end
@@ -300,7 +299,6 @@ RegisterNetEvent("sf_blackmarket_cl:addGoodsSellerTarget", function(listingId, l
 end)
 
 RegisterNetEvent("sf_blackmarket_cl:goodsSealContainer", function(listingId, propIds)
-    -- Animate the sealing (same container animation for the seller)
     doContainerAnim(0, propIds.container, propIds.lock, propIds.collision, true, listingId)
 end)
 
@@ -311,14 +309,12 @@ RegisterNetEvent("sf_blackmarket_cl:updateGoodsOpenContainer", function(listingI
     SetEntityCollision(collision, true, true)
     SetEntityCompletelyDisableCollision(container, false, false)
 
-    -- Remove seal zone for seller
     local sealZone = "bm_goods_seal_" .. listingId
     exports['qb-target']:RemoveZone(sealZone)
     for i = 1, #goodsTargetZones do
         if goodsTargetZones[i] == sealZone then table.remove(goodsTargetZones, i); break end
     end
 
-    -- Add loot zone (only buyer can interact server-side)
     local zoneName  = "bm_goods_loot_" .. listingId
     local min, max  = GetModelDimensions(joaat(Config.props.crate))
     local crateDim  = max - min
@@ -349,7 +345,6 @@ RegisterNetEvent("sf_blackmarket_cl:sellerNotify", function(listingId, locationI
     else
         QBCore.Functions.Notify(Config.notifText.listingSold, "success")
     end
-    -- Send to UI for timer display
     SendNUIMessage({ action = "goodsSellerAlert", data = { listingId = listingId, coords = coords, sealDeadline = sealDeadline, label = itemLabel } })
 end)
 
@@ -428,6 +423,12 @@ end)
 RegisterNUICallback("getListings", function(data, cb)
     QBCore.Functions.TriggerCallback("sf_blackmarket_sv:getListings", function(listings)
         cb(listings)
+    end)
+end)
+
+RegisterNUICallback("getPlayerItems", function(data, cb)
+    QBCore.Functions.TriggerCallback("sf_blackmarket_sv:getPlayerItems", function(items)
+        cb(items or {})
     end)
 end)
 

@@ -98,7 +98,27 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
     background-color: var(--background-3); color: white;
 }
 #crypto { margin: 0 0.4vh; }
-.crypto-icon i { margin-right: 0.3vh; }
+
+/* ─── Crypto Balance + Pending Badge ──────────────────────────────────────── */
+.crypto-balance-wrap {
+    gap: 0.5vh;
+    padding: 0 1vh;
+}
+.pending-badge {
+    display: flex;
+    align-items: center;
+    background-color: rgba(240, 165, 0, 0.18);
+    border: 1px solid rgba(240, 165, 0, 0.35);
+    color: var(--sold);
+    font-size: 1.15vh;
+    font-weight: 600;
+    padding: 0.15vh 0.55vh;
+    border-radius: 0.3vh;
+    white-space: nowrap;
+    margin-left: 0.3vh;
+    cursor: default;
+}
+
 #close:hover { cursor: pointer; background-color: var(--danger); }
 
 /* ─── Notification ─────────────────────────────────────────────────────────── */
@@ -207,6 +227,21 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
     min-width: 0;
 }
 
+/* ─── Item Image with fallback ─────────────────────────────────────────────── */
+.item-img-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,.2);
+    font-size: 3vh;
+    min-height: 8vh;
+    max-width: 8vh;
+    max-height: 8vh;
+    width: 8vh;
+    margin-top: 5.5vh;
+    margin-bottom: 2vh;
+}
+
 /* ─── Items Grid ───────────────────────────────────────────────────────────── */
 #items {
     display: grid;
@@ -229,7 +264,8 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
     border-radius: 0.5vh;
     color: white; font-size: 1.3vh;
 }
-.item-container > img {
+.item-container > img,
+.item-container > .item-img-fallback {
     width: auto; height: auto;
     min-height: 8vh; max-width: 8vh; max-height: 8vh;
     margin-top: 5.5vh; margin-bottom: 2vh;
@@ -401,7 +437,14 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
 }
 .goods-card-sold    { border-left: 0.3vh solid var(--sold);    }
 .goods-card-pending { border-left: 0.3vh solid var(--pending); }
-.goods-img { width: 5vh; height: 5vh; object-fit: contain; }
+.goods-img {
+    width: 5vh; height: 5vh; object-fit: contain;
+}
+.goods-card .item-img-fallback {
+    width: 5vh; height: 5vh; font-size: 2.5vh;
+    min-height: unset; max-width: unset; max-height: unset;
+    margin: 0;
+}
 .goods-info { flex: 1; display: flex; flex-direction: column; gap: 0.3vh; }
 .goods-name { font-size: 1.4vh; font-weight: 600; display: flex; align-items: center; gap: 0.6vh; }
 .goods-meta { font-size: 1.2vh; color: rgba(255,255,255,.5); display: flex; gap: 1vh; }
@@ -432,6 +475,11 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
     flex-direction: column;
     gap: 1.2vh;
     color: white;
+    max-height: 56vh;
+    overflow: hidden;
+}
+.modal-box-wide {
+    width: 55vh;
 }
 .modal-header {
     display: flex;
@@ -441,9 +489,21 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
     font-weight: 600;
     border-bottom: 1px solid rgba(255,255,255,.1);
     padding-bottom: 1vh;
+    flex-shrink: 0;
 }
 .modal-close { color: rgba(255,255,255,.5); cursor: pointer; font-size: 1.4vh; }
 .modal-close:hover { color: var(--danger); }
+.modal-back-btn {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.12) !important;
+    color: rgba(255,255,255,.6);
+    border-radius: 0.3vh;
+    padding: 0.3vh 0.7vh;
+    font-size: 1.2vh;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.modal-back-btn:hover { background: rgba(255,255,255,.13); color: white; }
 .modal-field { display: flex; flex-direction: column; gap: 0.4vh; }
 .modal-field label { font-size: 1.2vh; color: rgba(255,255,255,.5); }
 .modal-row { display: flex; gap: 1vh; }
@@ -461,4 +521,109 @@ button, button:focus { outline: none; background: transparent; border: 1px solid
     box-sizing: border-box;
 }
 .modal-input:focus { border-color: var(--accent); }
-.modal-error { font-size: 1.2vh; color: var(--danger); }
+.modal-error { font-size: 1.2vh; color: var(--danger); flex-shrink: 0; }
+
+/* ─── Inventory Picker ─────────────────────────────────────────────────────── */
+.inv-search { flex-shrink: 0; }
+
+.inv-loading,
+.inv-empty {
+    color: rgba(255,255,255,.35);
+    font-size: 1.4vh;
+    text-align: center;
+    padding: 3vh 0;
+    flex-shrink: 0;
+}
+
+.inv-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.8vh;
+    overflow-y: auto;
+    padding-right: 0.2vh;
+    flex: 1;
+}
+
+.inv-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5vh;
+    background: var(--background-3);
+    border: 1px solid rgba(255,255,255,.07) !important;
+    border-radius: 0.5vh;
+    padding: 1.2vh 0.6vh 0.8vh;
+    cursor: pointer;
+    color: white;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    text-align: center;
+}
+.inv-card:hover {
+    border-color: rgba(0,158,115,.5) !important;
+    background: rgba(0,158,115,.08);
+    transform: translateY(-0.15vh);
+}
+.inv-card-img-wrap {
+    width: 5vh; height: 5vh;
+    display: flex; align-items: center; justify-content: center;
+}
+.inv-card-img {
+    max-width: 5vh; max-height: 5vh;
+    object-fit: contain;
+}
+.inv-card .item-img-fallback {
+    width: 5vh; height: 5vh; font-size: 2.2vh;
+    min-height: unset; max-width: unset; max-height: unset;
+    margin: 0;
+}
+.inv-card-label {
+    font-size: 1.15vh;
+    font-weight: 500;
+    line-height: 1.3;
+    word-break: break-word;
+}
+.inv-card-amt {
+    font-size: 1.1vh;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* ─── Inventory selected preview ──────────────────────────────────────────── */
+.inv-selected-preview {
+    display: flex;
+    align-items: center;
+    gap: 1.2vh;
+    background: var(--background-3);
+    border: 1px solid rgba(0,158,115,.25);
+    border-radius: 0.5vh;
+    padding: 1vh 1.2vh;
+    flex-shrink: 0;
+}
+.inv-preview-img-wrap {
+    width: 5vh; height: 5vh;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.inv-preview-img {
+    max-width: 5vh; max-height: 5vh;
+    object-fit: contain;
+}
+.inv-preview-info { display: flex; flex-direction: column; gap: 0.3vh; }
+.inv-preview-name { font-size: 1.5vh; font-weight: 600; }
+.inv-preview-stock { font-size: 1.2vh; color: rgba(255,255,255,.45); }
+
+/* ─── Listing total preview ────────────────────────────────────────────────── */
+.inv-total-preview {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.3vh;
+    color: rgba(255,255,255,.6);
+    padding: 0.5vh 0;
+    border-top: 1px solid rgba(255,255,255,.07);
+    flex-shrink: 0;
+}
+.inv-total-preview span:last-child {
+    font-weight: 600;
+    color: white;
+}

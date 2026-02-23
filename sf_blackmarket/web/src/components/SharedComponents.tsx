@@ -1,9 +1,55 @@
-// ─── CartItem ──────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from 'react';
 import { ICartItem, INotif, Item } from '../types/interfaces';
 import { ConfigUI, ConfigNotif } from '../config';
 import { fetchNui } from '../utils/fetchNui';
 import { useNuiEvent } from '../hooks/useNuiEvent';
+
+// ─── Image with fallback ───────────────────────────────────────────────────────
+interface ItemImgProps {
+    image: string;
+    label?: string;
+    className?: string;
+}
+export const ItemImg: React.FC<ItemImgProps> = ({ image, label = '', className }) => {
+    const [errored, setErrored] = useState(false);
+    const src = `https://cfx-nui-qs-inventory/html/images/${image}`;
+    if (errored) {
+        return (
+            <div className={`item-img-fallback ${className ?? ''}`} title={label}>
+                <i className="fa-solid fa-box" />
+            </div>
+        );
+    }
+    return (
+        <img
+            className={className}
+            src={src}
+            alt={label}
+            onError={() => setErrored(true)}
+        />
+    );
+};
+
+// ─── Price display (bitcoin icon instead of text acronym) ─────────────────────
+interface PriceTagProps {
+    amount: number;
+    className?: string;
+    iconStyle?: React.CSSProperties;
+}
+export const PriceTag: React.FC<PriceTagProps> = ({ amount, className, iconStyle }) => {
+    if (ConfigUI.paymentType === 'crypto') {
+        return (
+            <span className={className} style={{ display: 'flex', alignItems: 'center', gap: '0.35vh' }}>
+                <i
+                    className={String(ConfigUI.cryptoIcon ?? 'fa-solid fa-bitcoin-sign')}
+                    style={{ fontSize: '1.1em', opacity: 0.85, ...iconStyle }}
+                />
+                {amount}
+            </span>
+        );
+    }
+    return <span className={className}>${amount}</span>;
+};
 
 // ─── CartItem Component ────────────────────────────────────────────────────────
 interface CartItemProps {
@@ -67,7 +113,7 @@ export const CartItem: React.FC<CartItemProps> = ({ itemData, shopItemStock, rem
                     <div onClick={handleIncrease} className="checkout-increase checkout-increment">+</div>
                 </div>
                 <div className="checkout-price">
-                    {ConfigUI.paymentType === 'crypto' ? `${totalItemPrice} ${ConfigUI.acronym}` : `$${totalItemPrice}`}
+                    <PriceTag amount={totalItemPrice} />
                 </div>
             </div>
         </div>
@@ -83,7 +129,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ quantity, label, price }) 
             <div className="order-item">{label}</div>
         </div>
         <div className="order-item-price">
-            {ConfigUI.paymentType === 'crypto' ? `${price * quantity} ${ConfigUI.acronym}` : `$${price * quantity}`}
+            <PriceTag amount={price * quantity} />
         </div>
     </div>
 );
@@ -137,7 +183,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ total, items, pendingOrder, 
             <div id="checkout-total">
                 <div id="checkout-total-text">Total</div>
                 <div id="checkout-total-amt">
-                    {ConfigUI.paymentType === 'crypto' ? `${total} ${ConfigUI.acronym}` : `$${total}`}
+                    <PriceTag amount={total} />
                 </div>
             </div>
             {pendingOrder
@@ -197,13 +243,26 @@ export const Cart: React.FC<CartProps> = ({ cartItems, marketItems, pendingOrder
 };
 
 // ─── Header Component ──────────────────────────────────────────────────────────
-interface HeaderProps { icon: JSX.Element | string; amt: number; handleSearch: (e: React.ChangeEvent<HTMLInputElement>) => void; }
-export const Header: React.FC<HeaderProps> = ({ icon, amt, handleSearch }) => (
+interface HeaderProps {
+    amt: number;
+    pendingAmt?: number;
+    handleSearch: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+export const Header: React.FC<HeaderProps> = ({ amt, pendingAmt, handleSearch }) => (
     <div id="top">
         <input onChange={handleSearch} id="search" type="text" placeholder="Search items..." />
-        <div id="crypto" className="top-item">
-            <div className="crypto-icon">{icon}</div>
+        <div id="crypto" className="top-item crypto-balance-wrap">
+            <i
+                className={String(ConfigUI.cryptoIcon ?? 'fa-solid fa-bitcoin-sign')}
+                style={{ fontSize: '1.6vh', marginRight: '0.4vh', opacity: 0.9 }}
+            />
             <div className="currency-amt">{amt}</div>
+            {!!pendingAmt && pendingAmt > 0 && (
+                <div className="pending-badge" title="Funds locked in pending order">
+                    <i className="fa-solid fa-clock" style={{ fontSize: '0.9vh', marginRight: '0.25vh' }} />
+                    {pendingAmt}
+                </div>
+            )}
         </div>
         <div onClick={() => fetchNui('close')} id="close" className="top-item">
             <i className="fa-solid fa-x" />

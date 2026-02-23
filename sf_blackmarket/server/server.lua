@@ -127,14 +127,14 @@ local function saveOrderStash(stashId, items, cb)
     if not stashId or not items then return end
     for _, item in pairs(items) do item.description = nil end
     MySQL.insert(
-        'INSERT INTO stashitems (stash, items) VALUES (:stash, :items) ON DUPLICATE KEY UPDATE items = :items',
+        'INSERT INTO inventory_stash (stash, items) VALUES (:stash, :items) ON DUPLICATE KEY UPDATE items = :items',
         { ['stash'] = stashId, ['items'] = json.encode(items) },
         function(id) cb(id) end
     )
 end
 
 local function deleteStash(stashId)
-    MySQL.query("DELETE FROM stashitems WHERE stash = ?", {stashId})
+    MySQL.query("DELETE FROM inventory_stash WHERE stash = ?", {stashId})
 end
 
 -- ─── Import Orders — SQL Persistence ─────────────────────────────────────────
@@ -162,7 +162,6 @@ local function orderComplete(index, stashId)
     if not order then return end
     if stashId and order.stashId ~= stashId then return end
 
-    -- clean up props
     if order.props then
         for _, netId in pairs(order.props) do
             local ent = NetworkGetEntityFromNetworkId(netId)
@@ -253,7 +252,6 @@ local function goodsContainerExpired(listingId)
     local gc = goodsContainers[listingId]
     if not gc then return end
 
-    -- clean up props
     if gc.props then
         for _, netId in pairs(gc.props) do
             local ent = NetworkGetEntityFromNetworkId(netId)
@@ -261,10 +259,8 @@ local function goodsContainerExpired(listingId)
         end
     end
 
-    -- remove target zones
     TriggerClientEvent("sf_blackmarket_cl:removeGoodsTargets", -1, listingId)
 
-    -- refund buyer
     local buyerPlayer = nil
     for _, src in ipairs(GetPlayers()) do
         local p = QBCore.Functions.GetPlayer(tonumber(src))
@@ -278,7 +274,6 @@ local function goodsContainerExpired(listingId)
         TriggerClientEvent("sf_blackmarket_cl:goodsRefunded", buyerPlayer.PlayerData.source, Config.notifText.listingExpired)
     end
 
-    -- mark listing as failed
     updateListingDB(listingId, { status = "failed" })
     if gc.stashId then deleteStash(gc.stashId) end
     returnLocationToPool(gc.locationIndex)
@@ -286,7 +281,6 @@ local function goodsContainerExpired(listingId)
 
     broadcastListings()
 
-    -- notify seller if online
     for _, src in ipairs(GetPlayers()) do
         local p = QBCore.Functions.GetPlayer(tonumber(src))
         if p and p.PlayerData.citizenid == gc.sellerCid then
@@ -299,7 +293,6 @@ local function completeGoodsOrder(listingId)
     local gc = goodsContainers[listingId]
     if not gc then return end
 
-    -- Remove remaining props
     SetTimeout(Config.lootTimeout * 60000, function()
         if goodsContainers[listingId] then
             if goodsContainers[listingId].props then
@@ -345,6 +338,29 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:getListings", function(src, c
     end)
 end)
 
+-- ─── Player Items (for listing modal inventory picker) ────────────────────────
+QBCore.Functions.CreateCallback("sf_blackmarket_sv:getPlayerItems", function(src, cb)
+    local Player = QBCore.Functions.GetPlayer(src)
+    if not Player then cb({}); return end
+
+    local result = {}
+    for _, item in pairs(Player.PlayerData.items) do
+        if item and item.name and item.amount and item.amount > 0 then
+            local qbItem = QBCore.Shared.Items[item.name:lower()]
+            result[#result + 1] = {
+                name   = item.name,
+                label  = (qbItem and qbItem.label)  or item.label or item.name,
+                amount = item.amount,
+                image  = (qbItem and qbItem.image)  or item.image or (item.name .. ".png"),
+                type   = (qbItem and qbItem.type)   or "item",
+            }
+        end
+    end
+
+    table.sort(result, function(a, b) return a.label < b.label end)
+    cb(result)
+end)
+
 -- ─── Import Order Callback ────────────────────────────────────────────────────
 QBCore.Functions.CreateCallback("sf_blackmarket_sv:attemptOrder", function(src, cb, order, orderType)
     if not order or #order == 0 then return end
@@ -353,7 +369,6 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:attemptOrder", function(src, 
 
     local cid = Player.PlayerData.citizenid
 
-    -- Check existing orders
     for _, v in pairs(pendingOrders) do
         if v.src == src or v.cid == cid then
             cb({ success = false, notif = "Order failed", error = "player already has order pending" })
@@ -368,20 +383,16 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:attemptOrder", function(src, 
         return
     end
 
-    -- Determine item list (imports vs contraband)
     local useContraband = (orderType == "contraband")
     local discount      = useContraband and (1 - Config.contraband.discount / 100) or 1.0
 
-    -- If contraband, check unlock
     if useContraband then
         getPlayerOrders(cid, function(count)
             if count < Config.contraband.ordersRequired then
                 cb({ success = false, notif = Config.notifText.contrabandLocked })
                 return
             end
-            -- proceed with order (same logic below, called recursively isn't clean — inline)
         end)
-        -- For cleanliness, we'll validate inline below after we know items are valid
     end
 
     local cost        = 0
@@ -390,7 +401,6 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:attemptOrder", function(src, 
     for i = 1, #order do
         local itemQty = tonumber(order[i].quantity)
 
-        -- validate item exists in market
         if not isMarketItem(order[i].item) then
             cb({ success = false, notif = "Order failed", error = "invalid item in cart" })
             return
@@ -459,14 +469,12 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:createListing", function(src,
 
     local cid = Player.PlayerData.citizenid
 
-    -- Check max listings
     getPlayerListingCount(cid, function(count)
         if count >= Config.goodsMaxListings then
             cb({ success = false, notif = Config.notifText.maxListings })
             return
         end
 
-        -- Validate item
         local qty  = tonumber(data.quantity) or 1
         local item = Player.Functions.GetItemByName(data.item)
         if not item or item.amount < qty then
@@ -474,7 +482,6 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:createListing", function(src,
             return
         end
 
-        -- Optional listing fee
         if Config.goodsListingFee > 0 then
             if not Player.Functions.RemoveMoney(Config.paymentType, Config.goodsListingFee) then
                 cb({ success = false, notif = Config.notifText.cantAfford })
@@ -587,10 +594,8 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:buyListing", function(src, cb
                 isLooted      = false,
             }
 
-            -- Notify buyer and spawn container client-side
             TriggerClientEvent("sf_blackmarket_cl:goodsSpawnContainer", src, listingId, locationIndex, Config.deliveryLocations[locationIndex])
 
-            -- Notify seller if online
             for _, playerSrc in ipairs(GetPlayers()) do
                 local p = QBCore.Functions.GetPlayer(tonumber(playerSrc))
                 if p and p.PlayerData.citizenid == row.seller_cid then
@@ -599,7 +604,6 @@ QBCore.Functions.CreateCallback("sf_blackmarket_sv:buyListing", function(src, cb
                 end
             end
 
-            -- 10-min expiry timer
             SetTimeout(Config.goodsSealTime * 60000, function()
                 local gc = goodsContainers[listingId]
                 if gc and not gc.sealed then
@@ -695,6 +699,7 @@ RegisterNetEvent("sf_blackmarket_sv:finishLooting", function(index)
     end
 
     saveOrderStash(stashId, orderItems, function(id)
+        src = src
         if id then
             TriggerClientEvent("inventory:client:SetCurrentStash", src, stashId)
             exports[Config.inventory]:OpenInventory("stash", stashId, nil, src)
@@ -705,7 +710,6 @@ RegisterNetEvent("sf_blackmarket_sv:finishLooting", function(index)
     order.isLooted       = true
     updateImportOrderDB(index, "is_looted", 1)
 
-    -- XP / order count
     incrementPlayerOrders(Player.PlayerData.citizenid)
 
     SetTimeout(Config.lootTimeout * 60000, function()
@@ -722,7 +726,6 @@ RegisterNetEvent("sf_blackmarket_sv:goodsPropsSpawned", function(netIds, listing
     local gc = goodsContainers[listingId]
     if not gc then return end
     gc.props = netIds
-    -- Add seller-only fill target
     local lockEnt    = NetworkGetEntityFromNetworkId(netIds.lock)
     local lockCoords = vec4(GetEntityCoords(lockEnt), GetEntityHeading(lockEnt))
     TriggerClientEvent("sf_blackmarket_cl:addGoodsSellerTarget", -1, listingId, lockCoords, gc.sellerCid)
@@ -746,29 +749,23 @@ RegisterNetEvent("sf_blackmarket_sv:attemptSealGoods", function(listingId)
         TriggerClientEvent('QBCore:Notify', src, "Seal deadline passed", "error"); return
     end
 
-    -- Check seller has items
     local sellerItem = Player.Functions.GetItemByName(gc.item)
     if not sellerItem or sellerItem.amount < gc.quantity then
         TriggerClientEvent('QBCore:Notify', src, Config.notifText.goodsNotEnough, "error"); return
     end
 
-    -- Remove items from seller
     Player.Functions.RemoveItem(gc.item, gc.quantity)
     TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[gc.item:lower()], "remove")
 
-    -- Transfer payment to seller
     Player.Functions.AddMoney(Config.paymentType, gc.price, "blackmarket-goods-sale")
 
     gc.sealed = true
     updateListingDB(listingId, { sealed = 1 })
 
-    -- Notify seller
     TriggerClientEvent('QBCore:Notify', src, Config.notifText.listingSealed, "success")
 
-    -- Seal animation
     TriggerClientEvent("sf_blackmarket_cl:goodsSealContainer", src, listingId, gc.props)
 
-    -- Update crate target for buyer, remove seller fill target
     SetTimeout(2000, function()
         local gcNow = goodsContainers[listingId]
         if not gcNow or not gcNow.props then return end
@@ -776,7 +773,6 @@ RegisterNetEvent("sf_blackmarket_sv:attemptSealGoods", function(listingId)
         local crateCoords = vec4(GetEntityCoords(crateEnt), GetEntityHeading(crateEnt))
         TriggerClientEvent("sf_blackmarket_cl:updateGoodsOpenContainer", -1, listingId, gcNow.props.container, gcNow.props.collision, crateCoords, gcNow.buyerCid)
 
-        -- Notify buyer with GPS
         for _, pSrc in ipairs(GetPlayers()) do
             local p = QBCore.Functions.GetPlayer(tonumber(pSrc))
             if p and p.PlayerData.citizenid == gcNow.buyerCid then
@@ -857,7 +853,6 @@ RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
     if not Player then return end
     local cid = Player.PlayerData.citizenid
 
-    -- Rebuild import orders for this player
     for k, v in pairs(pendingOrders) do
         if v.cid == cid then
             v.src = src
@@ -894,7 +889,6 @@ RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
             end
         end
 
-        -- Re-add target zones for all pending orders on this client
         if v.props then
             if not v.isOpen then
                 local lock       = NetworkGetEntityFromNetworkId(v.props.lock)
@@ -908,7 +902,6 @@ RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
         end
     end
 
-    -- Rebuild goods containers for this player (seller or buyer)
     for lid, gc in pairs(goodsContainers) do
         if gc.sellerCid == cid and not gc.sealed then
             TriggerClientEvent("sf_blackmarket_cl:sellerNotify", src, lid, gc.locationIndex, Config.deliveryLocations[gc.locationIndex], gc.label, gc.sealDeadline)
@@ -916,7 +909,6 @@ RegisterNetEvent("sf_blackmarket_sv:initPendingOrders", function()
         if gc.buyerCid == cid and gc.sealed and not gc.isLooted then
             TriggerClientEvent("sf_blackmarket_cl:goodsReadyForBuyer", src, lid, Config.deliveryLocations[gc.locationIndex])
         end
-        -- Re-add target zones
         if gc.props then
             if not gc.sealed then
                 local lockEnt    = NetworkGetEntityFromNetworkId(gc.props.lock)
@@ -949,7 +941,6 @@ AddEventHandler('onResourceStart', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     getMarketItems()
 
-    -- Load pending import orders from DB and rebuild state
     MySQL.query('SELECT * FROM sf_blackmarket_orders WHERE is_looted = 0', {}, function(rows)
         if not rows then setupAvailableLocations(); return end
         for _, row in ipairs(rows) do
@@ -967,15 +958,10 @@ AddEventHandler('onResourceStart', function(resource)
                 props          = nil,
                 orderType      = row.order_type or "import",
             }
-            -- Check if delivery time has already passed
-            if os.time() > row.delivery_time then
-                -- Will be triggered when player reconnects via initPendingOrders
-            end
         end
         setupAvailableLocations()
     end)
 
-    -- Load goods containers from DB
     MySQL.query("SELECT * FROM sf_blackmarket_listings WHERE status = 'sold' AND sealed = 0 AND is_looted = 0", {}, function(rows)
         if not rows then return end
         for _, row in ipairs(rows) do
@@ -996,7 +982,6 @@ AddEventHandler('onResourceStart', function(resource)
                     sealed        = false,
                     isLooted      = false,
                 }
-                -- Check if deadline already passed
                 if os.time() > row.seal_deadline then
                     SetTimeout(100, function() goodsContainerExpired(row.id) end)
                 else

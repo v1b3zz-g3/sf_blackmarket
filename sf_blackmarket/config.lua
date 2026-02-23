@@ -11,7 +11,7 @@ Config.reset        = 360    -- mins for market to restock
 Config.maxOrderQueue = 3     -- max pending orders at once (≤ # delivery locations)
 Config.lootTimeout  = 3      -- mins after looting to clear props & stash
 Config.orderTimeout = 30     -- mins after delivery; if unlooted, order cleared
-Config.deliveryTime = { min = 20, max = 30 }
+Config.deliveryTime = { min = 1, max = 1 }
 
 Config.policeNotifChance = 0.2  -- chance to alert police; 0 = disabled
 function Config.policeNotify(coords)
@@ -55,7 +55,7 @@ Config.goodsListingFee   = 0    -- optional upfront fee to create a listing
 
 -- ─── Contraband Tab (Lvl 2) ───────────────────────────────────────────────────
 Config.contraband = {
-    ordersRequired = 60,   -- completed purchases needed to unlock the tab
+    ordersRequired = 1,   -- completed purchases needed to unlock the tab
     discount       = 20,   -- percentage discount applied to Config.items prices
     extraItems = {
         -- Items available ONLY in the contraband tab (full price)
